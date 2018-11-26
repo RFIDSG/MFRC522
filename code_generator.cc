@@ -29,44 +29,56 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Author: kenton@google.com (Kenton Varda)
-//
-// Front-end for protoc code generator plugins written in C++.
-//
-// To implement a protoc plugin in C++, simply write an implementation of
-// CodeGenerator, then create a main() function like:
-//   int main(int argc, char* argv[]) {
-//     MyCodeGenerator generator;
-//     return google::protobuf::compiler::PluginMain(argc, argv, &generator);
-//   }
-// You must link your plugin against libprotobuf and libprotoc.
-//
-// To get protoc to use the plugin, do one of the following:
-// * Place the plugin binary somewhere in the PATH and give it the name
-//   "protoc-gen-NAME" (replacing "NAME" with the name of your plugin).  If you
-//   then invoke protoc with the parameter --NAME_out=OUT_DIR (again, replace
-//   "NAME" with your plugin's name), protoc will invoke your plugin to generate
-//   the output, which will be placed in OUT_DIR.
-// * Place the plugin binary anywhere, with any name, and pass the --plugin
-//   parameter to protoc to direct it to your plugin like so:
-//     protoc --plugin=protoc-gen-NAME=path/to/mybinary --NAME_out=OUT_DIR
-//   On Windows, make sure to include the .exe suffix:
-//     protoc --plugin=protoc-gen-NAME=path/to/mybinary.exe --NAME_out=OUT_DIR
+//  Based on original Protocol Buffers design by
+//  Sanjay Ghemawat, Jeff Dean, and others.
 
-#ifndef GOOGLE_PROTOBUF_COMPILER_PLUGIN_H__
-#define GOOGLE_PROTOBUF_COMPILER_PLUGIN_H__
+#include <google/protobuf/compiler/code_generator.h>
 
 #include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/strutil.h>
+
 namespace google {
 namespace protobuf {
 namespace compiler {
 
-class CodeGenerator;    // code_generator.h
+CodeGenerator::~CodeGenerator() {}
+GeneratorContext::~GeneratorContext() {}
 
-// Implements main() for a protoc plugin exposing the given code generator.
-LIBPROTOC_EXPORT int PluginMain(int argc, char* argv[], const CodeGenerator* generator);
+io::ZeroCopyOutputStream*
+GeneratorContext::OpenForAppend(const string& filename) {
+  return NULL;
+}
+
+io::ZeroCopyOutputStream* GeneratorContext::OpenForInsert(
+    const string& filename, const string& insertion_point) {
+  GOOGLE_LOG(FATAL) << "This GeneratorContext does not support insertion.";
+  return NULL;  // make compiler happy
+}
+
+void GeneratorContext::ListParsedFiles(
+    vector<const FileDescriptor*>* output) {
+  GOOGLE_LOG(FATAL) << "This GeneratorContext does not support ListParsedFiles";
+}
+
+// Parses a set of comma-delimited name/value pairs.
+void ParseGeneratorParameter(const string& text,
+                             vector<pair<string, string> >* output) {
+  vector<string> parts = Split(text, ",", true);
+
+  for (int i = 0; i < parts.size(); i++) {
+    string::size_type equals_pos = parts[i].find_first_of('=');
+    pair<string, string> value;
+    if (equals_pos == string::npos) {
+      value.first = parts[i];
+      value.second = "";
+    } else {
+      value.first = parts[i].substr(0, equals_pos);
+      value.second = parts[i].substr(equals_pos + 1);
+    }
+    output->push_back(value);
+  }
+}
 
 }  // namespace compiler
 }  // namespace protobuf
-
 }  // namespace google
-#endif  // GOOGLE_PROTOBUF_COMPILER_PLUGIN_H__
